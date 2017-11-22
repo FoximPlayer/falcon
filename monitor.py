@@ -1,31 +1,13 @@
 import falcon
 import os
+import socket
+import psutil
 from psutil import virtual_memory
 from psutil import disk_partitions
 from psutil import disk_usage
 from psutil import cpu_times
-from psutil import net_connections
-
-
-
-def list_media_devices():
-    with open("/proc/partitions", "r") as f:
-        devices = []
-        
-        for line in f.readlines()[2:]: # skip header lines
-            words = [ word.strip() for word in line.split() ]
-            minor_number = int(words[1])
-            device_name = words[3]
-            
-            if (minor_number % 16) == 0:
-                path = "/sys/class/block/" + device_name
-                
-                if os.path.islink(path):
-                    if os.path.realpath(path).find("/usb") > 0:
-                        devices.append("/dev/" + device_name)
-        
-        return devices
-
+from psutil import net_if_addrs
+from subprocess import Popen, PIPE
 
 class MemResource:
     def on_get(self, req, resp):
@@ -46,13 +28,27 @@ class MemResource:
         resp.media = response
 
 class DiskResource:
-    def on_get(self, req, resp):
+    def __init__(self):
+        self.devices = []
+        with Popen(["mount"], stdout=PIPE) as proc:
+            out = proc.stdout.read()
+        lines = out.decode("utf-8").split('\n')
+        for l in lines:
+            if l[0:4] == '/dev':
+                ch = l.split(' ')
+
+                device = (ch[0],ch[2], ch[4],)
+                self.devices.append(device)
+
+    def on_get(self, req, resp, ):
         response = []
-        for mp in ['/', '/boot']:
+        for device in self.devices:
+            mp = device[1]
             disk = disk_usage(mp)
             response.append({
             'mount_point': mp,
-            'device': device,
+            'device': device[0],
+            'fstype': device[2],
             'total': disk.total,
             'used': disk.used,
             'free': disk.free,
@@ -80,11 +76,12 @@ class CPUResource:
 
 class NetResource:
     def on_get(self, req, resp):
-        net = net_connections()
+        net = net_if_addrs()
         response = {
-            'address': "???"
-
-        }
+            'family': socket.AF_INET,
+            'sock stream': socket.SOCK_STREAM,
+            'sock dgram': socket.SOCK_DGRAM,
+            }
         resp.media = response
 
 api = falcon.API()
