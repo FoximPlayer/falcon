@@ -2,12 +2,29 @@ import falcon
 import os
 import socket
 import psutil
+import netifaces
 from psutil import virtual_memory
 from psutil import disk_partitions
 from psutil import disk_usage
 from psutil import cpu_times
 from psutil import net_if_addrs
 from subprocess import Popen, PIPE
+
+for iface4 in netifaces.interfaces():
+    for iftype, data in netifaces.ifaddresses(iface4).items():
+        if iftype in (netifaces.AF_INET, netifaces.AF_INET):
+            for info4 in data:
+                ip4 = (info4['addr'])
+
+for iface6 in netifaces.interfaces():
+    for iftype, data in netifaces.ifaddresses(iface6).items():
+        if iftype in (netifaces.AF_INET, netifaces.AF_INET6):
+            for info6 in data:
+                ip6 = (info6['addr'])
+
+
+
+
 
 class MemResource:
     def on_get(self, req, resp):
@@ -70,17 +87,19 @@ class CPUResource:
         'steal': cpu.steal,
         'guest': cpu.guest,
         'nice': cpu.nice,
-
+        'number_of_cpu': psutil.cpu_count(),
+        'xload': "here must be uptime"
         }
         resp.media = response
+
 
 class NetResource:
     def on_get(self, req, resp):
         net = net_if_addrs()
         response = {
             'family': socket.AF_INET,
-            'sock stream': socket.SOCK_STREAM,
-            'sock dgram': socket.SOCK_DGRAM,
+            'IPv4_address': ip4,
+            'IPv6_address': ip6,
             }
         resp.media = response
 
